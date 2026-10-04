@@ -1,0 +1,12 @@
+[submodule "vendor/lyric-dom"]
+	path = vendor/lyric-dom
+	url = https://github.com/Xpercent/lyric-dom
+	branch = main
+[submodule "vendor/lyric-kit"]
+	path = vendor/lyric-kit
+	url = https://github.com/Xpercent/lyric-kit
+	branch = main
+[submodule "vendor/applemusic-like-lyrics"]
+	path = vendor/applemusic-like-lyrics
+	url = https://github.com/Xpercent/applemusic-like-lyrics
+	branch = main

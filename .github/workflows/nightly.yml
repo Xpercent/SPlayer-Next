@@ -30,6 +30,7 @@ jobs:
       - name: Check out dev branch
         uses: actions/checkout@v5
         with:
+          submodules: recursive
           ref: dev
 
       - name: Compare commit with latest nightly release
@@ -92,6 +93,7 @@ jobs:
       - name: Check out git repository
         uses: actions/checkout@v5
         with:
+          submodules: recursive
           ref: ${{ needs.check-commits.outputs.build_sha }}
           fetch-depth: 0
 
@@ -190,6 +192,7 @@ jobs:
       - name: Check out dev branch
         uses: actions/checkout@v5
         with:
+          submodules: recursive
           ref: ${{ needs.check-commits.outputs.build_sha }}
           fetch-depth: 0
 

@@ -8,6 +8,7 @@ import autoImports from "./auto-eslint.mjs";
 export default defineConfig(
   globalIgnores([
     "**/node_modules/",
+    "**/vendor/**",
     "**/dist/",
     "**/out/",
     "**/target/",

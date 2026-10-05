@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { LyricLine } from "@shared/types/lyrics";
 import { useSettingsStore } from "@/stores/settings";
+import { normalizeLyricRubyLayout } from "@/utils/lyric/rubyLayout";
 import AMLLLyrics from "./AMLLLyrics.vue";
 import DefaultLyrics from "./DefaultLyrics.vue";
 import LyricCredit from "./LyricCredit.vue";
@@ -40,6 +41,17 @@ const springConfig = computed(() => ({
   stiffness: settings.lyric.springStiffness,
 }));
 
+/**
+ * 合并了重叠注音的歌词行
+ *
+ * 注音宽于正文时溢出压到相邻注音，两套引擎都按数据排布，故送渲染前统一规范化。
+ */
+const displayLyricLines = computed(() =>
+  settings.lyric.showRuby
+    ? normalizeLyricRubyLayout(props.lyricLines, settings.lyric)
+    : props.lyricLines,
+);
+
 const setCurrentTime = (time: number, isSeeking = false) => {
   activeEngineRef.value?.setCurrentTime(time, isSeeking);
 };
@@ -63,7 +75,7 @@ defineExpose({
   <AMLLLyrics
     v-if="settings.lyric.engine === 'amll'"
     ref="activeEngineRef"
-    :lyric-lines="props.lyricLines"
+    :lyric-lines="displayLyricLines"
     :initial-time="props.initialTime"
     :playing="props.playing"
     :align-position="settings.lyric.alignPosition"
@@ -86,7 +98,7 @@ defineExpose({
   <DefaultLyrics
     v-else
     ref="activeEngineRef"
-    :lyric-lines="props.lyricLines"
+    :lyric-lines="displayLyricLines"
     :initial-time="props.initialTime"
     :playing="props.playing"
     :align-position="settings.lyric.alignPosition"

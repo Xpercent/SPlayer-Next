@@ -40,6 +40,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build vendor lyric packages
+        run: pnpm build:vendor
+
       - name: Test
         run: pnpm test
 

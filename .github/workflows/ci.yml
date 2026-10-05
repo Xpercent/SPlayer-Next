@@ -32,6 +32,9 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      - name: Build vendor lyric packages
+        run: pnpm build:vendor
+
       - name: Typecheck
         run: pnpm typecheck
         env:

@@ -54,6 +54,8 @@ interface LoadRuntimeOptions {
 
 /** 单次音源兜底过程的重试状态 */
 interface SourceRetryState {
+  /** 已下载文件加载失败后不再重复命中 */
+  skipDownloaded: boolean;
   /** 是否已放弃官方在线接口，后续仅尝试插件 */
   skipOfficialOnline: boolean;
   /** 已尝试且需跳过的插件 ID */
@@ -221,6 +223,7 @@ export const load = async (
 
 /** 创建音源重试状态 */
 const createSourceRetryState = (): SourceRetryState => ({
+  skipDownloaded: false,
   skipOfficialOnline: false,
   skippedPluginIds: new Set<string>(),
 });
@@ -238,6 +241,7 @@ const resolveTrackSourceWithRetry = (
   resolveTrackSource(track, {
     silent: true,
     onError,
+    skipDownloaded: retry.skipDownloaded,
     skipOfficialOnline: retry.skipOfficialOnline,
     skipPluginIds: [...retry.skippedPluginIds],
   });
@@ -252,6 +256,10 @@ const markRetryableSourceFailure = (
   resolved: ResolvedTrackSource,
   retry: SourceRetryState,
 ): boolean => {
+  if (resolved.provider === "download" && !retry.skipDownloaded) {
+    retry.skipDownloaded = true;
+    return true;
+  }
   if (resolved.provider === "official" && !retry.skipOfficialOnline) {
     retry.skipOfficialOnline = true;
     return true;
@@ -310,15 +318,17 @@ const loadTrackSourceWithFallback = async (
       usingInitial &&
       !result.ok &&
       resolved.provider !== "local" &&
+      resolved.provider !== "download" &&
       (resolved.provider !== "cache" || Boolean(result.error && isSkippableError(result.error)))
     ) {
       continue;
     }
     const canRetry =
       !result.ok &&
-      result.error !== ErrorCode.NETWORK_ERROR &&
-      result.error !== ErrorCode.NETWORK_TIMEOUT &&
-      (retryOnAnyFailure || Boolean(result.error && isSkippableError(result.error))) &&
+      (resolved.provider === "download" ||
+        (result.error !== ErrorCode.NETWORK_ERROR &&
+          result.error !== ErrorCode.NETWORK_TIMEOUT &&
+          (retryOnAnyFailure || Boolean(result.error && isSkippableError(result.error))))) &&
       markRetryableSourceFailure(resolved, retry);
     if (canRetry) continue;
     return { status: "loaded", result, resolved };
@@ -751,16 +761,22 @@ export const switchDevice = async (deviceId: string | null): Promise<void> => {
   }
 };
 
+/** 列表播放选项 */
+export interface PlayFromOptions {
+  /** 省略时顺序模式从首曲开始、随机模式随机选曲 */
+  startIndex?: number;
+  /** 队列中曲目共用的播放来源上下文 */
+  context?: PlaybackContext;
+}
+
 /**
- * 设置队列并从指定位置开始播放
+ * 设置队列并开始播放，未指定起点时遵循随机模式
  * @param items - 歌曲列表
- * @param startIndex - 起始播放位置，默认 0
- * @param context - 队列中曲目共用的播放来源上下文
+ * @param options - 起始位置和播放来源选项
  */
 export const playFrom = async (
   items: readonly Track[],
-  startIndex = 0,
-  context?: PlaybackContext,
+  { startIndex, context }: PlayFromOptions = {},
 ): Promise<void> => {
   if (items.length === 0) return;
   const status = useStatusStore();
@@ -768,7 +784,9 @@ export const playFrom = async (
   // 退出特殊模式
   status.heartMode = false;
   status.fmMode = false;
-  const idx = Math.max(0, Math.min(startIndex, items.length - 1));
+  const start =
+    startIndex ?? (status.shuffleMode === "on" ? Math.floor(Math.random() * items.length) : 0);
+  const idx = Math.max(0, Math.min(start, items.length - 1));
   const isSameTrack = media.track?.id === items[idx]?.id;
   queue.setQueue(items, context);
   status.playIndex = idx;
@@ -1284,10 +1302,12 @@ export const playFile = async (filePath: string): Promise<void> => {
 export const playFiles = async (filePaths: string[]): Promise<void> => {
   if (filePaths.length === 0) return;
   const tracks = filePaths.map(createLocalTrack);
-  await playFrom(tracks, 0, {
-    originId: "local-files",
-    originType: "track",
-    originName: "本地文件",
+  await playFrom(tracks, {
+    context: {
+      originId: "local-files",
+      originType: "track",
+      originName: "本地文件",
+    },
   });
 };
 

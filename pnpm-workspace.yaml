@@ -23,9 +23,6 @@ allowBuilds:
   esbuild: true
   vue-demi: true
 minimumReleaseAgeExclude:
-  # lyric-dom 0.2.1 把 lyric-kit devDependency 提到 ^0.6.1，该版本由子模块上游
-  # SPlayer-Dev/lyric-kit 自行发布，与 vendor/lyric-kit 当前代码同源
-  - lyric-kit@0.6.1
   - app-builder-lib@26.15.3
   - builder-util@26.15.3
   - dmg-builder@26.15.3
@@ -43,3 +40,10 @@ overrides:
   # vendor 的 AMLL core 把 @pixi/* 声明为 "*" 对等依赖，自动装对等依赖时会挑到 6.x，
   # 与仓库 devDependencies 里的 7.4.3 不同实例，打包时 @pixi/display 会取不到 Rectangle
   "@pixi/core": ^7.4.3
+  # 歌词三库固定用 vendor 子模块，覆盖 package.json 里跟随上游的发布版本号，
+  # 使 package.json 能原样对齐上游、同步上游时不再冲突。
+  # overrides 让解析结果永远是 vendor 路径，绝不会退回 npm 上的发布版；
+  # 子模块未初始化时装出来的是悬空链接，由 typecheck 与打包报错暴露
+  lyric-kit: link:vendor/lyric-kit
+  lyric-dom: link:vendor/lyric-dom
+  "@applemusic-like-lyrics/core": link:vendor/applemusic-like-lyrics/packages/core

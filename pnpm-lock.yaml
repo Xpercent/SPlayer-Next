@@ -336,8 +336,8 @@ importers:
         specifier: ^20.13.2
         version: 20.14.5
       lyric-kit:
-        specifier: ^0.6.0
-        version: 0.6.0
+        specifier: ^0.6.1
+        version: 0.6.1
       tsdown:
         specifier: ^0.22.14
         version: 0.22.14(@tsdown/css@0.22.14)(@volar/typescript@2.4.28)(tsx@4.23.7)(typescript@7.0.2)(vue-tsc@3.3.9(typescript@7.0.2))
@@ -4570,8 +4570,8 @@ packages:
   lunr@2.3.9:
     resolution: {integrity: sha512-zTU3DaZaF3Rt9rhN3uBMGQD3dD2/vFQqnvZCDv4dl5iOzq2IZQqTxu90r4E5J+nP70J3ilqVCrbho2eWaeW8Ow==}
 
-  lyric-kit@0.6.0:
-    resolution: {integrity: sha512-kINhwn8MHU8dr1sG0wd26EumsC6xUSxABNilHzTK0vUbbuZ91Sa6jVEn/USok+vNi4qfAgtMUz0YC9B0wpZP2g==}
+  lyric-kit@0.6.1:
+    resolution: {integrity: sha512-/Qi3kJtLzlw5+oi5yEPpBPSzK5FW0CFHZCXtApvnv6QOjUeDnrF9p2G3heKCVesLWJi122YmWWNgVAdZhiljlA==}
 
   magic-regexp@0.10.0:
     resolution: {integrity: sha512-Uly1Bu4lO1hwHUW0CQeSWuRtzCMNO00CmXtS8N6fyvB3B979GOEEeAkiTUDsmbYLAbvpUS/Kt5c4ibosAzVyVg==}
@@ -10260,7 +10260,7 @@ snapshots:
 
   lunr@2.3.9: {}
 
-  lyric-kit@0.6.0: {}
+  lyric-kit@0.6.1: {}
 
   magic-regexp@0.10.0:
     dependencies:

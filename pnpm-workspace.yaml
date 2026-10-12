@@ -23,6 +23,9 @@ allowBuilds:
   esbuild: true
   vue-demi: true
 minimumReleaseAgeExclude:
+  # lyric-dom 0.2.1 把 lyric-kit devDependency 提到 ^0.6.1，该版本由子模块上游
+  # SPlayer-Dev/lyric-kit 自行发布，与 vendor/lyric-kit 当前代码同源
+  - lyric-kit@0.6.1
   - app-builder-lib@26.15.3
   - builder-util@26.15.3
   - dmg-builder@26.15.3

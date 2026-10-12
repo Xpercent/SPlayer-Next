@@ -8,3 +8,6 @@ auto-eslint.mjs
 auto-imports.d.ts
 components.d.ts
 native/*/index.d.ts
+
+# 歌词三库是 git 子模块，各自用 biome 格式化，父仓库不越界改写
+vendor/

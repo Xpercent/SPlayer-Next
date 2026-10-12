@@ -18,6 +18,8 @@ export default defineConfig(
     "**/.vitepress/",
     "native/*/index.d.ts",
     ".github/scripts/",
+    // 歌词三库是 git 子模块，规则与工具链由各自仓库负责
+    "vendor/",
   ]),
   tseslint.configs.recommended,
   { languageOptions: { globals: autoImports.globals } },

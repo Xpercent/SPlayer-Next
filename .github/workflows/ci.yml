@@ -26,6 +26,10 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # 歌词三库的 dist 不入库，typecheck 需要它的类型声明，先构建
+      - name: Build vendor lyric libs
+        run: pnpm build:vendor
+
       - name: Format check
         run: pnpm prettier --check .
 

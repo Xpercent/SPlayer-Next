@@ -40,6 +40,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # 歌词三库的 dist 不入库，用例直接 import lyric-kit，先构建
+      - name: Build vendor lyric libs
+        run: pnpm build:vendor
+
       - name: Test
         run: pnpm test
 

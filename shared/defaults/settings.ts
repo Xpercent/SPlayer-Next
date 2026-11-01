@@ -21,6 +21,7 @@ export const defaultSystemConfig: SystemConfig = {
     volume: 1,
     loudnessNormalization: false,
     audioOutputMode: "shared",
+    keepScreenAwake: false,
     equalizer: {
       enabled: false,
       preset: "flat",
@@ -97,7 +98,7 @@ export const defaultSystemConfig: SystemConfig = {
   },
   lyric: {
     enableOnlineTTMLLyric: false,
-    amllDbServer: "https://amlldb.bikonoo.com/%p/%s.ttml",
+    amllDbServer: "",
   },
   localLyric: {
     enableLocalTTMLOverride: false,

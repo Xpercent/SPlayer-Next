@@ -57,6 +57,8 @@ export interface PlayerSettings {
   loudnessNormalization: boolean;
   /** 音频输出模式：共享（默认）/ WASAPI 独占（仅 Windows） */
   audioOutputMode: AudioOutputMode;
+  /** 播放页展开且正在播放时保持屏幕常亮 */
+  keepScreenAwake: boolean;
   /** 均衡器配置 */
   equalizer: EqualizerSettings;
   /** 按 `{Track.id}|{歌词源}` 记忆的歌词偏移（ms，正值为歌词提前）；为 0 时不写入 */
@@ -315,7 +317,7 @@ export interface McpAgentApp {
 export interface OnlineLyricSettings {
   /** 启用在线 TTML 歌词 */
   enableOnlineTTMLLyric: boolean;
-  /** AMLL TTML DB 服务地址，需含 %s 占位符 */
+  /** AMLL TTML DB 镜像地址模板，需含 %s，%p 可选；留空使用官方 API */
   amllDbServer: string;
 }
 
@@ -353,7 +355,7 @@ export interface DownloadSettings {
   dir: string | null;
   /** 下载音质 */
   quality: PluginQuality;
-  /** 模拟播放下载：网易云用播放接口替代下载接口，避免占用每日下载次数 */
+  /** 模拟播放下载：NCM 用播放接口替代下载接口，避免占用每日下载次数 */
   usePlaybackForDownload: boolean;
   /** 文件名模板，支持 {artist} {title} {album}；不含子目录 */
   fileTemplate: string;
@@ -375,7 +377,7 @@ export interface DownloadSettings {
   lyricFileFormat: DownloadLyricFormat;
 }
 
-/** 主窗口几何 */
+/** 主窗口几何（旧版持久化数据，仅供迁移到 Electron 内置窗口状态） */
 export interface MainWindowState {
   width: number;
   height: number;
@@ -418,7 +420,7 @@ export interface WindowStates {
 }
 
 /** 应用更新通道候选值，同时作为运行时校验名单 */
-export const UPDATE_CHANNELS = ["stable", "beta", "alpha", "nightly"] as const;
+export const UPDATE_CHANNELS = ["stable", "beta", "nightly"] as const;
 
 /** 应用更新通道 */
 export type UpdateChannel = (typeof UPDATE_CHANNELS)[number];
@@ -427,7 +429,7 @@ export type UpdateChannel = (typeof UPDATE_CHANNELS)[number];
 export interface AppUpdateSettings {
   /** 自动检查更新 */
   autoCheck: boolean;
-  /** 更新通道：stable 正式通道 / beta 预览通道 / alpha 内测通道 / nightly 持续构建通道 */
+  /** 更新通道：stable 正式通道 / beta 预览通道 / nightly 持续构建通道 */
   channel: UpdateChannel;
 }
 
@@ -485,7 +487,7 @@ export interface SystemConfig {
     onboardingCompleted: boolean;
     /** 用户已同意的协议版本号 */
     agreedAgreementVersion: number;
-    /** NCM请求注入国内 IP（X-Real-IP/X-Forwarded-For） */
+    /** NCM 请求注入国内 IP（X-Real-IP/X-Forwarded-For） */
     neteaseRealIp: boolean;
     /** KG 登录版本（standard 标准版 / concept 概念版） */
     kugouLoginVersion: KugouLoginVersion;

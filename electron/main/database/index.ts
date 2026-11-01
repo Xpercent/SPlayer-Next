@@ -251,5 +251,3 @@ export {
   getRandomTracks,
   getLibraryStats,
 } from "./queries";
-
-export type { FileRecord, UpsertTrack } from "./queries";

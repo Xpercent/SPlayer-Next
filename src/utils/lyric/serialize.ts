@@ -5,7 +5,8 @@
  * 走 parse → 重序列化，[ti:]/[ar:] 等信息头天然被丢弃，内容只剩歌词
  */
 
-import type { LyricFormat, LyricInput } from "@shared/types/lyrics";
+import type { LyricFormat, LyricInput } from "lyric-kit";
+
 import type { DownloadLyricFormat } from "@shared/types/download";
 import { parseLyric, toEnhancedLRC, toLRC, toTTML } from "lyric-kit";
 

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { NeteaseSong } from "@/types/netease";
+import type { NeteaseSong } from "@shared/types/platform/netease";
 import { songToTrack } from "./netease";
 
-describe("网易云歌曲歌手格式化", () => {
+describe("NCM歌曲歌手格式化", () => {
   it.each(["ar", "artists"])("过滤 %s 中的空名称，保留有效歌手", (field) => {
     const song = {
       id: 325,
@@ -27,5 +27,18 @@ describe("网易云歌曲歌手格式化", () => {
       artists: [],
       cloud: true,
     });
+  });
+});
+
+describe("NCM歌曲碟片解析", () => {
+  it.each([
+    ["1 致天堂的信 Letters to Heaven", { disc: 1, discTitle: "致天堂的信 Letters to Heaven" }],
+    ["02", { disc: 2, discTitle: undefined }],
+    ["CD3", { disc: 3, discTitle: undefined }],
+    ["", { disc: undefined, discTitle: undefined }],
+  ])("解析 %j", (cd, expected) => {
+    const song = { id: 1, name: "歌曲", cd } as unknown as NeteaseSong;
+    const track = songToTrack(song);
+    expect({ disc: track.disc, discTitle: track.discTitle }).toEqual(expected);
   });
 });

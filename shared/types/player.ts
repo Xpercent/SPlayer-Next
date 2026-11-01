@@ -1,5 +1,8 @@
-import type { LyricFormat } from "./lyrics";
+import type { PlaybackQueueSnapshot } from "./music";
+import type { LyricFormat } from "lyric-kit";
+
 import type { Platform } from "./platform";
+import type { MusicSearchCandidate } from "./plugin";
 
 /** 播放器状态 */
 export type PlayerState = "idle" | "loading" | "playing" | "paused" | "stopped";
@@ -10,8 +13,8 @@ export type RepeatMode = "list" | "one";
 /** 随机模式 */
 export type ShuffleMode = "off" | "on";
 
-/** 歌曲来源：本地 / 流媒体 / 在线平台 */
-export type TrackSource = "local" | "streaming" | Platform;
+/** 歌曲来源：本地 / 流媒体 / 在线平台 / 插件 */
+export type TrackSource = "local" | "streaming" | "plugin" | Platform;
 
 /** 播放来源类型 */
 export type PlaybackOriginType = "track" | "playlist" | "album" | "artist" | "radio" | "page";
@@ -30,6 +33,7 @@ export interface PlaybackContext {
 
 /** 歌手 */
 export interface Artist {
+  serverId?: string;
   id?: string;
   name: string;
   avatar?: string;
@@ -39,6 +43,7 @@ export interface Artist {
 
 /** 专辑 */
 export interface Album {
+  serverId?: string;
   id?: string;
   name: string;
   /** 封面 URL */
@@ -53,6 +58,7 @@ export interface Album {
 
 /** 歌单 */
 export interface Playlist {
+  serverId?: string;
   id?: string;
   name: string;
   cover?: string;
@@ -72,7 +78,7 @@ export interface AudioQuality {
 }
 
 /**
- * 付费标记，遵循网易云 fee 规范
+ * 付费标记，遵循 NCM fee 规范
  * - 0: 免费
  * - 1: VIP
  * - 4: 需购买（数字专辑等）
@@ -82,6 +88,8 @@ export type TrackFee = 0 | 1 | 4 | 8;
 
 /** 歌曲信息 */
 export interface Track {
+  /** 服务端权威收藏状态；缺失表示尚未读取 */
+  favorite?: boolean;
   /** 平台 id */
   id: string;
   /** 平台二级 id */
@@ -90,6 +98,12 @@ export interface Track {
   mediaId?: string;
   /** 歌曲来源 */
   source: TrackSource;
+  /** 独立插件来源及重新取数所需的轻量曲目信息 */
+  plugin?: {
+    pluginId: string;
+    source: string;
+    musicInfo: MusicSearchCandidate;
+  };
   /** 本地路径 */
   path?: string;
   /** CUE 文件路径 */
@@ -104,6 +118,8 @@ export interface Track {
   serverId?: string;
   /** 流媒体服务器原生 ID（仅 source==='streaming'） */
   originalId?: string;
+  /** 流媒体账号或地址变更后的媒体身份代次 */
+  serverRevision?: number;
   /** 标题 */
   title: string;
   /** 注释/副标题 */
@@ -112,6 +128,10 @@ export interface Track {
   artists: Artist[];
   /** 专辑 */
   album?: Album;
+  /** 碟号，从 1 开始 */
+  disc?: number;
+  /** 碟片名称 */
+  discTitle?: string;
   /** 曲目编号 */
   track?: number;
   /** 时长（毫秒） */
@@ -215,7 +235,7 @@ export type PlayerEvent =
   | { type: "status"; data: PlayerStatus }
   | { type: "position"; data: { position: number; duration: number } }
   | { type: "transitionReady"; data: { id: string; position: number; endPosition?: number } }
-  | { type: "transition"; data: { active: boolean; mode: "crossfade" } }
+  | { type: "transition"; data: { active: boolean; mode: "crossfade" | "automix" } }
   | { type: "seek"; data: { position: number } }
   | { type: "ended" }
   | { type: "sourceError" }
@@ -226,6 +246,7 @@ export type PlayerEvent =
   | { type: "playTrack"; data: { track: Track } }
   | { type: "setShuffle"; data: { mode: ShuffleMode } }
   | { type: "setRepeat"; data: { mode: RepeatMode } }
+  | { type: "getQueue"; data: { requestId: string; offset: number; limit: number } }
   | { type: "addToQueue"; data: { tracks: Track[]; position: "next" | "end" } }
   | { type: "toggleLike" }
   | { type: "fftData"; data: FftData }
@@ -277,6 +298,13 @@ export interface AudioStreamInfo {
   isLimiterActive: boolean;
 }
 
+/** PCM 预载与自动混音分析的独立就绪状态 */
+export interface PreparedTrackResult {
+  ready: boolean;
+  /** 当前曲展示时间轴上的计划入场点，仅在 AutoMix 就绪时返回 */
+  autoMixStartMs?: number;
+}
+
 /** 播放器 API */
 export interface PlayerApi {
   /**
@@ -284,14 +312,17 @@ export interface PlayerApi {
    * @param id - 预载任务标识，用于取消或在加载时消费该槽位
    * @param source - 本地音频文件或已完成下载的缓存文件路径
    * @param startMs - 预载起点，单位为毫秒，默认为 0
-   * @returns 预载就绪时返回 true，任务被取消或取代时返回 false
+   * @param preference - 交叉过渡的曲尾交接偏好
+   * @param options - 自动混音模式和有效播放范围
+   * @returns PCM 槽位和自动混音计划各自的就绪状态
    */
   prepareNext(
     id: string,
     source: string,
     startMs?: number,
     preference?: TransitionPreference,
-  ): Promise<boolean>;
+    options?: import("./automix").AutoMixPrepareOptions,
+  ): Promise<PreparedTrackResult>;
   /**
    * 取消指定预载任务并释放缓存租约，不影响其他代次的任务
    * @param id - 要取消的预载任务标识
@@ -304,6 +335,7 @@ export interface PlayerApi {
    * @param remainingMs - 当前曲目剩余的墙钟时间
    * @param preference - 曲尾交接时机与淡化时长偏好
    * @param options - 下一曲的权威元数据和播放上下文
+   * @param mode - 过渡模式，省略时使用交叉过渡
    * @returns 交接成功时返回下一曲信息，未命中时返回失败响应
    */
   transitionPrepared(
@@ -312,6 +344,7 @@ export interface PlayerApi {
     remainingMs: number,
     preference: TransitionPreference,
     options: LoadOptions,
+    mode?: import("./automix").TransitionMode,
   ): Promise<IpcResponse<LoadResult>>;
   /** 加载音频（本地路径或网络地址）；可选下发权威 meta 用于 SMTC/托盘 */
   load: (source: string, options?: LoadOptions) => Promise<IpcResponse<LoadResult>>;
@@ -376,10 +409,21 @@ export interface PlayerApi {
   getSelectedDeviceName: () => Promise<IpcResponse<string | null>>;
   /** 同步播放模式到托盘 */
   syncPlayMode: (repeatMode: string, shuffleMode: string) => void;
+  /**
+   * 同步主窗口当前队列索引
+   * @param index - 当前队列索引，无当前队列项时为 -1
+   */
+  syncQueueIndex: (index: number) => void;
   /** 同步当前歌曲喜欢状态到托盘 */
   syncLikeState: (liked: boolean) => void;
   /** 广播播放控制事件 */
   dispatch: (type: string) => void;
+  /**
+   * 回传主进程请求的队列分页
+   * @param requestId - 队列查询标识
+   * @param snapshot - 队列分页及当前播放索引
+   */
+  respondQueue: (requestId: string, snapshot: PlaybackQueueSnapshot) => void;
   /** 订阅播放事件 */
   onEvent: (callback: (event: PlayerEvent) => void) => () => void;
 }

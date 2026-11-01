@@ -134,19 +134,21 @@ defineExpose({ playAll });
     <!-- 固定表头 -->
     <template #header>
       <div class="pr-1.5">
-        <div class="flex items-center gap-3 pl-3 pr-6 mx-3 h-10 text-sm text-on-surface-variant/60">
+        <div
+          class="flex items-center gap-3 pl-3 pr-6 mx-3 h-10 border-2 border-solid border-transparent text-sm text-on-surface-variant/60"
+        >
           <div class="w-8 shrink-0 flex items-center justify-center"><span>#</span></div>
           <div class="flex-1 min-w-0 px-1.5">{{ t("songList.title") }}</div>
-          <div class="shrink-0 text-center text-xs leading-6" style="min-width: fit-content">
+          <div class="w-32 shrink-0 whitespace-nowrap">
             {{ t("download.colStatus") }}
           </div>
-          <div class="shrink-0 text-center text-xs leading-6" style="min-width: fit-content">
+          <div class="w-20 shrink-0 text-center whitespace-nowrap">
             {{ t("download.colSize") }}
           </div>
-          <div class="shrink-0 text-center text-xs leading-6" style="min-width: fit-content">
+          <div class="w-16 shrink-0 text-center whitespace-nowrap">
             {{ t("songList.duration") }}
           </div>
-          <div class="shrink-0 text-center text-xs leading-6" style="min-width: fit-content">
+          <div class="w-20 shrink-0 text-center whitespace-nowrap">
             {{ t("songList.actions") }}
           </div>
         </div>

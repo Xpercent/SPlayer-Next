@@ -119,6 +119,11 @@ impl PlaybackHandle {
         self.transition.set_speed_ratio(ratio);
     }
 
+    /// 平滑撤回 AutoMix，继续输出原曲
+    pub fn cancel_transition(&self) {
+        self.transition.cancel();
+    }
+
     pub fn play(&self) {
         if let Err(error) = self.stream.play() {
             warn!(%error, "恢复音频输出失败");
@@ -131,9 +136,12 @@ impl PlaybackHandle {
         }
     }
 
-    /// 停止播放：实时回调转入静音填充，随句柄销毁释放输出流
+    /// 停止播放：先停止设备流，再让实时回调转入静音填充
     pub fn stop(&self) {
         self.stopped.store(true, Ordering::Release);
+        if let Err(error) = self.stream.pause() {
+            warn!(%error, "停止音频输出失败");
+        }
     }
 
     pub fn set_volume(&self, volume: f32) {

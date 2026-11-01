@@ -47,7 +47,7 @@ export const neteaseRaw = async (
   const authFailure = isExplicitNeteaseAuthFailure({ status: res.status, body: res.body });
   if (!res.ok || authFailure) {
     const error = new NeteaseApiError(
-      !res.ok ? res.error : "网易云登录状态已失效",
+      !res.ok ? res.error : "NCM登录状态已失效",
       res.status,
       res.body,
     );

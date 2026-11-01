@@ -35,7 +35,7 @@ export const fetchPlaylist = async (
   const body = ensureOk(await neteaseApi.playlist_detail({ id: playlistId }));
   if (options.signal?.aborted) return;
   const raw = body?.playlist;
-  if (!raw) throw new Error("网易云歌单响应缺少 playlist");
+  if (!raw) throw new Error("NCM歌单响应缺少 playlist");
 
   options.onMeta?.(toPlaylist(raw));
   options.onTrackIds?.((raw.trackIds ?? []).map((item: { id: number }) => String(item.id)));

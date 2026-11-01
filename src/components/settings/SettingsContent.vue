@@ -36,14 +36,23 @@ const onCategorySelect = (id: string) => {
   nextTick(() => scrollRef.value?.scrollTo({ top: 0 }));
 };
 
-const onSearchSelect = (categoryId: string, itemKey: string) => {
+/**
+ * 定位设置项，子项收起时定位最近的父项
+ * @param categoryId - 设置分类
+ * @param itemKey - 设置项键名
+ * @param parentKeys - 从外到内的父项键名
+ */
+const onSearchSelect = (categoryId: string, itemKey: string, parentKeys: string[] = []) => {
   highlightKey.value = itemKey;
   if (activeId.value !== categoryId) {
     activeId.value = categoryId;
   }
   nextTick(() => {
     setTimeout(() => {
-      const el = document.getElementById(`setting-${itemKey}`);
+      const el = [itemKey, ...parentKeys.toReversed()]
+        .map((key) => document.getElementById(`setting-${key}`))
+        .find((element) => element !== null);
+      if (el) highlightKey.value = el.id.slice("setting-".length);
       el?.scrollIntoView({ block: "center", behavior: "smooth" });
       setTimeout(() => {
         highlightKey.value = undefined;

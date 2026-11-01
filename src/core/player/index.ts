@@ -1,9 +1,15 @@
-import type { IpcResponse, LoadResult, PlaybackContext, Track } from "@shared/types/player";
-import { TRANSITION_LOOKAHEAD_MS } from "@shared/constants/playback";
+import type {
+  IpcResponse,
+  LoadResult,
+  PlaybackContext,
+  RepeatMode,
+  ShuffleMode,
+  Track,
+} from "@shared/types/player";
+import { AUTOMIX_LOOKAHEAD_MS, TRANSITION_LOOKAHEAD_MS } from "@shared/constants/playback";
 import type { TagEditRequest, TagWriteOutcome } from "@shared/types/tagEditor";
-import type { PersonalFmOptions } from "@/types/netease";
+import type { PersonalFmOptions } from "@shared/types/platform/netease";
 import { handleEvent } from "./events";
-import type { RepeatMode, ShuffleMode } from "@/stores/status";
 import { useMediaStore } from "@/stores/media";
 import { useSettingsStore } from "@/stores/settings";
 import { useStatusStore } from "@/stores/status";
@@ -27,6 +33,7 @@ import {
   invalidateNextTrackPreload,
   installNextTrackPreloadWatchers,
   beginPreparedTransition,
+  peekPreparedTrack,
   finishPreparedTransition,
   scheduleNextTrackPreload,
 } from "@/services/nextTrackPreloader";
@@ -554,6 +561,27 @@ export const play = async (): Promise<void> => {
   }
 };
 
+/** 自然结束后重播当前歌曲，流媒体重新取址并建立独立会话 */
+export const restartCurrentTrack = async (): Promise<void> => {
+  const media = useMediaStore();
+  const track = media.track;
+  if (!track) return;
+  const status = useStatusStore();
+  const myPauseToken = pauseToken;
+  if (track.source === "streaming") {
+    const loading = loadTrack(track, media.playbackContext, false);
+    const token = trackToken;
+    await loading;
+    if (token !== trackToken || myPauseToken !== pauseToken || status.state !== "paused") return;
+  } else {
+    const seeking = seek(0, true);
+    const token = trackToken;
+    await seeking;
+    if (token !== trackToken || myPauseToken !== pauseToken) return;
+  }
+  await play();
+};
+
 /** 切换播放/暂停 */
 export const togglePlay = (): void => {
   const status = useStatusStore();
@@ -883,7 +911,7 @@ export const saveTrackTags = async (edits: TagEditRequest[]): Promise<TagWriteOu
 
 /**
  * 进入心动模式：用智能推荐列表替换队列并从头播放
- * @param tracks - 网易云智能推荐曲目
+ * @param tracks - NCM 智能推荐曲目
  */
 export const playHeartMode = async (tracks: readonly Track[]): Promise<void> => {
   if (tracks.length === 0) return;
@@ -961,9 +989,10 @@ export const nextTrack = async (autoPlay = true): Promise<void> => {
 export const isSmartTransitionActive = (): boolean => transitionInFlight;
 
 /**
- * 在当前曲目尾部尝试以备用槽位进行自动交接
+ * 以可靠对拍计划或现有交叉过渡交接备用槽位
  * @param positionMs - 当前曲目的展示位置
  * @param preparedId - 后台通知对应的槽位，用于拒绝迟到通知
+ * @param endPositionMs - 后台确认的当前曲目有效终点
  */
 export const trySmartTransition = async (
   positionMs: number,
@@ -974,7 +1003,7 @@ export const trySmartTransition = async (
   const status = useStatusStore();
   if (
     transitionInFlight ||
-    settings.player.transitionMode !== "crossfade" ||
+    settings.player.transitionMode === "none" ||
     !status.isPlaying ||
     status.trackLoading ||
     status.fmMode ||
@@ -988,7 +1017,10 @@ export const trySmartTransition = async (
   const remainingWallMs = remainingMs / Math.max(status.speed, 0.1);
   if (
     !Number.isFinite(remainingWallMs) ||
-    remainingWallMs > TRANSITION_LOOKAHEAD_MS[settings.player.transitionPreference] ||
+    remainingWallMs >
+      (settings.player.transitionMode === "automix"
+        ? AUTOMIX_LOOKAHEAD_MS
+        : TRANSITION_LOOKAHEAD_MS[settings.player.transitionPreference]) ||
     remainingWallMs < 1000
   )
     return;
@@ -1001,7 +1033,18 @@ export const trySmartTransition = async (
     shuffleMode: status.shuffleMode,
   });
   if (!candidate) return;
-  const prepared = beginPreparedTransition(candidate.track, preparedId);
+  const slot = peekPreparedTrack(candidate.track);
+  const autoMix = settings.player.transitionMode === "automix" && slot?.autoMixStartMs != null;
+  // 不适合 AutoMix 的曲目对按设置改用交叉过渡，关闭时交给曲尾正常切歌
+  if (
+    (!autoMix &&
+      settings.player.transitionMode === "automix" &&
+      !settings.player.automixCrossfadeFallback) ||
+    (autoMix && (Math.abs(status.speed - 1) >= 0.0001 || status.pitch !== 0)) ||
+    (!autoMix && remainingWallMs > TRANSITION_LOOKAHEAD_MS[settings.player.transitionPreference])
+  )
+    return;
+  const prepared = beginPreparedTransition(candidate.track, preparedId, positionMs);
   if (!prepared?.preparedId || !prepared.source) return;
   const shouldLog = lastLoggedTransitionId !== prepared.preparedId;
   if (shouldLog) lastLoggedTransitionId = prepared.preparedId;
@@ -1009,6 +1052,7 @@ export const trySmartTransition = async (
   const oldTrackId = status.currentTrack?.id;
   const token = trackToken;
   transitionInFlight = true;
+  let completed = false;
   try {
     const result = await window.api.player.transitionPrepared(
       prepared.preparedId,
@@ -1020,11 +1064,9 @@ export const trySmartTransition = async (
         context: status.currentPlaybackContext,
         autoPlay: true,
       },
+      ...(autoMix ? ["automix" as const] : []),
     );
-    if (token !== trackToken) {
-      if (shouldLog) console.info("[player:transition] 交叉过渡已被新的播放操作取消");
-      return;
-    }
+    if (token !== trackToken) return;
     if (!result.success || !result.data) {
       if (shouldLog) {
         console.warn(
@@ -1044,18 +1086,16 @@ export const trySmartTransition = async (
       await nextTrack();
       return;
     }
-    console.info("[player:transition] 音频交接完成", {
-      trackId: candidate.track.id,
-      title: candidate.track.title,
-    });
     onTrackEnded(false);
     const stopAfterTrack = autoClose.onTrackEnded();
     status.playIndex = candidate.index;
     await loadTrack(candidate.track, status.currentPlaybackContext, true, result, prepared.source);
+    completed = true;
     if (stopAfterTrack) await pause();
   } finally {
     transitionInFlight = false;
-    finishPreparedTransition(prepared.preparedId);
+    if (completed || token !== trackToken) finishPreparedTransition(prepared.preparedId);
+    else finishPreparedTransition(prepared.preparedId, prepared);
   }
 };
 
@@ -1346,6 +1386,7 @@ export const moveInQueue = (fromIndex: number, toIndex: number): void => {
 };
 
 let unsubscribe: (() => void) | null = null;
+let stopQueueIndexSync: (() => void) | null = null;
 let initialized = false;
 
 /** 初始化播放器 */
@@ -1358,10 +1399,17 @@ export const initPlayer = async (): Promise<void> => {
   await settings.syncSystem();
   // 流媒体 store 必须在恢复队列前就绪，否则队列里的 streaming track 拿不到 cfg
   await useStreamingStore().init();
-  // 插件 store 同理：在线歌曲 URL 兜底走插件，列表必须在 loadTrack 前就绪
-  void usePluginsStore().load();
   await queue.restoreQueue();
   const status = useStatusStore();
+  stopQueueIndexSync = watch(
+    () => status.currentIndex,
+    (index) => window.api.player.syncQueueIndex(index),
+    { immediate: true },
+  );
+  // 独立来源曲目恢复前等待所属插件，其余插件继续在后台启动。
+  await usePluginsStore().load(
+    status.currentTrack?.source === "plugin" ? status.currentTrack.plugin?.pluginId : undefined,
+  );
   // 兼容移除“不循环”前持久化的旧状态
   if ((status.repeatMode as string) === "off") status.repeatMode = "list";
   // 恢复上次的音量和播放模式到主进程
@@ -1474,6 +1522,9 @@ export const restoreLastTrack = async (): Promise<void> => {
 /** 清理事件订阅 */
 export const disposePlayer = (): void => {
   disposeNextTrackPreload();
+  stopQueueIndexSync?.();
+  stopQueueIndexSync = null;
+  window.api.player.syncQueueIndex(-1);
   if (unsubscribe) {
     unsubscribe();
     unsubscribe = null;

@@ -7,10 +7,8 @@ import type {
 } from "@shared/types/player";
 import type { Platform } from "@shared/types/platform";
 import type { ContentScope } from "@/types/collection";
-import type { SortField, SortOrder } from "@/types/list";
-import type { PersonalFmOptions } from "@/types/netease";
-export type { RepeatMode, ShuffleMode } from "@shared/types/player";
-export type { SortField, SortOrder } from "@/types/list";
+import type { SongListSortKey, SongListSortPreference } from "@/types/list";
+import type { PersonalFmOptions } from "@shared/types/platform/netease";
 import * as queue from "./queue";
 
 export const useStatusStore = defineStore(
@@ -32,6 +30,8 @@ export const useStatusStore = defineStore(
     const trackLoading = ref(false);
     /** 原生输出回调正在混合相邻两曲 */
     const transitioning = ref(false);
+    /** 正在进行的过渡类型 */
+    const transitionMode = ref<"crossfade" | "automix">("crossfade");
     /** 全屏播放器展开状态 */
     const isPlayerExpanded = ref(false);
     /** 外层播放队列 */
@@ -90,10 +90,31 @@ export const useStatusStore = defineStore(
     const likedPageTab = ref<ContentScope>("local");
     /** 设置弹窗上次手动选择的大分类 */
     const settingsCategory = ref("");
-    /** 歌曲列表排序字段 */
-    const sortField = ref<SortField>("none");
-    /** 歌曲列表排序方向 */
-    const sortOrder = ref<SortOrder>("asc");
+    /** 各列表作用域的排序偏好，仅保存非默认项 */
+    const sortPreferences = ref<Partial<Record<SongListSortKey, SongListSortPreference>>>({});
+
+    /**
+     * 读取指定作用域的排序偏好
+     * @param key - 列表排序作用域
+     * @returns 排序偏好，未设置时为默认值
+     */
+    const getSortPreference = (key: SongListSortKey): SongListSortPreference =>
+      sortPreferences.value[key] ?? { field: "none", order: "asc" };
+
+    /**
+     * 写入指定作用域的排序偏好
+     * @param key - 列表排序作用域
+     * @param preference - 排序偏好
+     */
+    const setSortPreference = (key: SongListSortKey, preference: SongListSortPreference): void => {
+      const current = sortPreferences.value[key];
+      if (current?.field === preference.field && current.order === preference.order) return;
+      const next = { ...sortPreferences.value };
+      if (preference.field === "none" && preference.order === "asc") delete next[key];
+      else next[key] = { ...preference };
+      sortPreferences.value = next;
+    };
+
     /** 是否正在播放 */
     const isPlaying = computed(() => state.value === "playing");
     /** 是否暂停 */
@@ -108,6 +129,8 @@ export const useStatusStore = defineStore(
      * media.track 在 load 成功后才更新，用于组件显示已加载完成的歌曲信息
      */
     const currentTrack = computed(() => queue.getTrack(playIndex.value));
+    /** 对外查询使用的有效队列索引，无当前队列项时为 -1 */
+    const currentIndex = computed(() => (currentTrack.value ? playIndex.value : -1));
     /** 当前队列项对应的播放来源上下文 */
     const currentPlaybackContext = computed(() => queue.getQueueItem(playIndex.value)?.context);
 
@@ -129,6 +152,7 @@ export const useStatusStore = defineStore(
       progress,
       trackLoading,
       transitioning,
+      transitionMode,
       isPlayerExpanded,
       outerQueueOpen,
       fullQueueOpen,
@@ -154,9 +178,11 @@ export const useStatusStore = defineStore(
       myPlaylistSource,
       likedPageTab,
       settingsCategory,
-      sortField,
-      sortOrder,
+      sortPreferences,
+      getSortPreference,
+      setSortPreference,
       currentTrack,
+      currentIndex,
       currentPlaybackContext,
       showComments,
     };
@@ -176,8 +202,7 @@ export const useStatusStore = defineStore(
         "myPlaylistSource",
         "likedPageTab",
         "settingsCategory",
-        "sortField",
-        "sortOrder",
+        "sortPreferences",
       ],
     },
   },

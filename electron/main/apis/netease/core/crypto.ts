@@ -69,7 +69,7 @@ export const aesDecrypt = (
 /**
  * RSA 加密
  *
- * 网易云的 weapi 要求「裸 RSA」：将明文左侧补 0 到 128 字节（1024bit 模长），
+ * NCM 的 weapi 要求「裸 RSA」：将明文左侧补 0 到 128 字节（1024bit 模长），
  * 再用公钥做一次模幂运算，输出 hex。node:crypto 的 RSA_NO_PADDING 正好对应
  */
 export const rsaEncrypt = (str: string, publicKey: string = PUBLIC_KEY): string => {

@@ -45,6 +45,20 @@ const lyricSourceOptions = computed<SSelectOption[]>(() => [
   { value: "self", label: t("settings.lyricSourcePreference.self") },
 ]);
 
+/** 当前歌曲是否手动选择过歌词，此时来源偏好不生效 */
+const manualPicked = ref(false);
+
+// 歌词每次重新加载（切歌、应用或恢复手动选择）都会变，借此刷新
+watch(
+  () => media.activeLyric,
+  async () => {
+    const track = media.track;
+    const picked = track ? Boolean(await window.api.lyrics.getManualMatch(toRaw(track))) : false;
+    if (track === media.track) manualPicked.value = picked;
+  },
+  { immediate: true },
+);
+
 /**
  * 生成歌手详情页跳转目标
  * @param artist - 当前歌曲的歌手
@@ -150,13 +164,18 @@ const alignItems = computed(() => {
 <template>
   <div
     v-if="displayTrack"
-    class="w-full flex flex-col gap-[0.5em] overflow-hidden px-2"
+    class="w-full flex flex-col gap-[0.5em] overflow-x-clip overflow-y-visible px-2"
     style="font-size: clamp(12px, calc(14 / 1080 * 100vh), 16px)"
     :class="alignItems"
   >
     <!-- 标题 -->
     <SMarquee fit class="max-w-full text-[2em] font-semibold leading-tight">
       {{ displayTrack.title }}
+      <IconSpExplicit
+        v-if="displayTrack.explicit && !settings.preset.hideExplicitTag"
+        :aria-label="t('songList.explicitTagLabel')"
+        class="inline-block align-[-0.1em] ml-1.5 size-[0.65em] text-cover/75"
+      />
     </SMarquee>
     <!-- 副标题/注释 -->
     <div
@@ -179,7 +198,21 @@ const alignItems = computed(() => {
         <IconSpLossless v-if="showLosslessIcon" class="text-[1.4em] -my-[0.4em]" />
         {{ qualityLabel }}
       </span>
+      <STooltip
+        v-if="manualPicked"
+        :content="t('player.lyricMatch.preferenceIgnored')"
+        :side-offset="8"
+        side="top"
+        cover
+      >
+        <span
+          class="inline-flex items-center justify-center leading-none px-1.5 py-1.2 rounded-md border border-solid border-cover/30"
+        >
+          {{ lyricLabel }}
+        </span>
+      </STooltip>
       <SPopselect
+        v-else
         v-model="settings.lyric.lyricSourcePreference"
         :options="lyricSourceOptions"
         side="top"

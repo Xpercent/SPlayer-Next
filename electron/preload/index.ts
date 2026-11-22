@@ -278,9 +278,9 @@ const api = {
     listFonts: () => ipcRenderer.invoke("system:listFonts"),
     // 拉远端字节回渲染层
     fetchRemoteBytes: (url: string) => ipcRenderer.invoke("system:fetchRemoteBytes", url),
-    // 保存文件到下载目录
-    saveFile: (data: ArrayBuffer, defaultName: string) =>
-      ipcRenderer.invoke("system:saveFile", data, defaultName),
+    // 弹出保存对话框让用户选择位置
+    saveFile: (data: ArrayBuffer, defaultName: string, title: string) =>
+      ipcRenderer.invoke("system:saveFile", data, defaultName, title),
     // 重启应用
     relaunch: () => ipcRenderer.invoke("system:relaunch"),
     // 测试当前网络代理
@@ -320,6 +320,8 @@ const api = {
     getTracksByIds: (ids: string[]) => ipcRenderer.invoke("library:getTracksByIds", ids),
     // 搜索曲目
     searchTracks: (query: string) => ipcRenderer.invoke("library:searchTracks", query),
+    // 搜索窗分组搜索（歌曲 / 专辑 / 歌手）
+    quickSearch: (keyword: string) => ipcRenderer.invoke("library:quickSearch", keyword),
     // 获取曲目总数
     getTrackCount: () => ipcRenderer.invoke("library:getTrackCount"),
     // 随机取一首曲目
@@ -543,14 +545,34 @@ const api = {
   },
   lyrics: {
     // 按 id 直取某平台歌词
-    matchById: (platform: string, id: string) =>
-      ipcRenderer.invoke("lyrics:matchById", platform, id),
+    matchById: (platform: string, id: string, track?: unknown, prefetch?: boolean) =>
+      ipcRenderer.invoke("lyrics:matchById", platform, id, track, prefetch),
     // 按 Track 元数据在某平台模糊搜索歌词
     matchByQuery: (platform: string, track: unknown) =>
       ipcRenderer.invoke("lyrics:matchByQuery", platform, track),
+    // 清除验证不通过的模糊匹配映射
+    forgetMatch: (track: unknown, platform: string) =>
+      ipcRenderer.invoke("lyrics:forgetMatch", track, platform),
+    // 记住验证通过的替代候选
+    rememberMatch: (track: unknown, platform: string, id: string) =>
+      ipcRenderer.invoke("lyrics:rememberMatch", track, platform, id),
+    // 按关键词搜索某平台的歌词候选
+    searchCandidates: (platform: string, keyword: string, track: unknown) =>
+      ipcRenderer.invoke("lyrics:searchCandidates", platform, keyword, track),
+    // 按 AMLL 条目 id 取 TTML
+    fetchTTMLById: (id: string) => ipcRenderer.invoke("lyrics:fetchTTMLById", id),
+    // 读取歌曲的手动选择
+    getManualMatch: (track: unknown) => ipcRenderer.invoke("lyrics:getManualMatch", track),
+    // 保存歌曲的手动选择
+    setManualMatch: (track: unknown, match: unknown) =>
+      ipcRenderer.invoke("lyrics:setManualMatch", track, match),
+    // 清除歌曲的手动选择
+    clearManualMatch: (track: unknown) => ipcRenderer.invoke("lyrics:clearManualMatch", track),
     // 获取 AMLL TTML DB 的 TTML
     fetchTTMLOverlay: (track: unknown, platform: string) =>
       ipcRenderer.invoke("lyrics:fetchTTMLOverlay", track, platform),
+    // 按元数据搜索 AMLL TTML DB
+    searchTTML: (track: unknown) => ipcRenderer.invoke("lyrics:searchTTML", track),
     // 在本地 TTML 歌词库目录中按元信息匹配
     matchLocalTTML: (track: unknown) => ipcRenderer.invoke("lyrics:matchLocalTTML", track),
     // 选择本地 TTML 歌词库目录
@@ -626,6 +648,11 @@ const api = {
     // 订阅当前曲目歌词偏移变化
     onLyricOffsetChange: (callback: (data: unknown) => void) =>
       subscribe("nowPlaying:lyric-offset-change", callback),
+  },
+  motionCover: {
+    // 解析曲目的动态封面
+    resolve: (track: unknown, source: string): Promise<string | null> =>
+      ipcRenderer.invoke("motionCover:resolve", track, source),
   },
   theme: {
     // 弹出文件选择框
@@ -884,6 +911,8 @@ const api = {
     getStatsSummary: () => ipcRenderer.invoke("stats:getStatsSummary"),
     // 取最常播放的曲目
     getTopTracks: (limit: number) => ipcRenderer.invoke("stats:getTopTracks", limit),
+    // 取最近播放的曲目
+    getRecentTracks: (limit: number) => ipcRenderer.invoke("stats:getRecentTracks", limit),
     // 取音乐库统计概览
     getLibraryStats: () => ipcRenderer.invoke("stats:getLibraryStats"),
     // 取最近 N 天的每日播放统计
